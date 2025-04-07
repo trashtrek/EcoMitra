@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EcoMitra - Upload</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .container {
+      display: flex;
+      height: 100%;
+    }
+    .left, .right {
+      flex: 1;
+      padding: 20px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    .left {
+      background-image: url('https://wallpapercave.com/wp/HuF9sgh.jpg');
+      background-size: cover;
+      background-position: center;
+      color: white;
+    }
+    .right {
+      background-color: #000;
+      color: white;
+    }
+    input[type="file"], input[type="text"], button.use-location {
+      margin: 10px 0;
+      padding: 10px;
+      width: 80%;
+      font-size: 16px;
+      border-radius: 6px;
+      border: none;
+    }
+    input[type="text"] {
+      background-color: #222;
+      color: white;
+    }
+    button.use-location {
+      background-color: #444;
+      color: white;
+      cursor: pointer;
+    }
+    button.use-location:hover {
+      background-color: #666;
+    }
+    #map {
+      height: 300px;
+      width: 100%;
+      margin-top: 10px;
+      border-radius: 10px;
+    }
+    h2 {
+      text-align: center;
+      color: white;
+    }
+    .submit-btn {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 30px;
+      background-color: lightgreen;
+      border: none;
+      border-radius: 8px;
+      font-size: 18px;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    }
+    .submit-btn:hover {
+      background-color: #66dd66;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="left">
+    <h2>Upload Image</h2>
+    <input type="file" id="imageUpload" accept="image/*">
+  </div>
+
+  <div class="right">
+    <h2>Enter Location</h2>
+    <button class="use-location" onclick="useCurrentLocation()">Use Current Location</button>
+    <input type="text" id="locationInput" placeholder="Type location or use button above...">
+    <div id="map"></div>
+  </div>
+</div>
+
+<button class="submit-btn" onclick="handleSubmit()">Submit</button>
+
+<!-- Google Maps API -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDa-g9F78fLXcQhvuHCQcdjMCpp7Bscr5w&libraries=places&callback=initMap" async defer></script>
+
+<script>
+  let map, marker, geocoder, input;
+
+  function initMap() {
+    const defaultLocation = { lat: 20.5937, lng: 78.9629 };
+    map = new google.maps.Map(document.getElementById("map"), {
+      zoom: 5,
+      center: defaultLocation,
+    });
+    geocoder = new google.maps.Geocoder();
+    input = document.getElementById("locationInput");
+
+    marker = new google.maps.Marker({
+      map: map,
+      draggable: true,
+    });
+
+    const autocomplete = new google.maps.places.Autocomplete(input);
+    autocomplete.addListener("place_changed", function () {
+      const place = autocomplete.getPlace();
+      if (!place.geometry) return;
+      map.setCenter(place.geometry.location);
+      map.setZoom(15);
+      marker.setPosition(place.geometry.location);
+    });
+
+    marker.addListener("dragend", function () {
+      const pos = marker.getPosition();
+      geocoder.geocode({ location: pos }, (results, status) => {
+        if (status === "OK" && results[0]) {
+          input.value = results[0].formatted_address;
+        }
+      });
+    });
+  }
+
+  function useCurrentLocation() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const pos = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          map.setCenter(pos);
+          map.setZoom(15);
+          marker.setPosition(pos);
+          geocoder.geocode({ location: pos }, (results, status) => {
+            if (status === "OK" && results[0]) {
+              input.value = results[0].formatted_address;
+            }
+          });
+        },
+        () => alert("Location permission denied.")
+      );
+    } else {
+      alert("Geolocation not supported by this browser.");
+    }
+  }
+
+  async function handleSubmit() {
+    const fileInput = document.getElementById("imageUpload");
+    const file = fileInput.files[0];
+    const locationText = document.getElementById("locationInput").value.trim();
+
+    if (!file || !locationText) {
+      alert("Please upload an image and enter a location.");
+      return;
+    }
+
+    const telegramToken = "7726200717:AAEXpR4KjtwA3JrSa0MYz3NxdocnwoR_z-8";
+
+    const locationChatMap = {
+      "Akkikavu": "6826629726",
+      "Chennai": "6826629726",
+      "Delhi": "6826629726"
+    };
+
+    const matchingChat = Object.entries(locationChatMap).find(([loc]) =>
+      locationText.toLowerCase().includes(loc.toLowerCase())
+    );
+
+    if (!matchingChat) {
+      alert("No matching Telegram chat ID for the entered location.");
+      return;
+    }
+
+    const chatId = matchingChat[1];
+    const sendPhotoUrl = `https://api.telegram.org/bot${telegramToken}/sendPhoto`;
+
+    const formData = new FormData();
+    formData.append("chat_id", chatId);
+    formData.append("caption", `🗺️ *Location:* ${locationText}\n📷 *Image Uploaded by User*`);
+    formData.append("parse_mode", "Markdown");
+    formData.append("photo", file); // Sending the file directly
+
+    try {
+      const response = await fetch(sendPhotoUrl, {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+      if (result.ok) {
+        alert("Submitted and sent to Telegram successfully!");
+      } else {
+        console.error("Telegram error:", result);
+        alert("Failed to send to Telegram.");
+      }
+    } catch (err) {
+      console.error("Upload error:", err);
+      alert("Something went wrong while uploading.");
+    }
+  }
+</script>
+
+</body>
+</html>
